@@ -5,31 +5,25 @@ const nodemailer = require("nodemailer");
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// Cấu hình transporter linh hoạt hơn với biến môi trường
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-        // Ưu tiên dùng biến môi trường, nếu chưa có thì dùng tạm giá trị mặc định của bạn
         user: process.env.EMAIL_USER || "trung142p@gmail.com",
         pass: process.env.EMAIL_PASS || "itgyatbljobrqath",
     },
 });
 
+// 1. Tạo đơn hàng mới (Dành cho khách hàng)
 router.post("/", async (req, res) => {
     try {
         const { order_code, customer_info, items, total_price, payment_method } = req.body;
 
-        // KIỂM TRA DỮ LIỆU: Đảm bảo không bị crash server nếu thiếu info
         if (!customer_info || !customer_info.name) {
-            return res.status(400).json({
-                success: false,
-                message: "Thiếu thông tin khách hàng (Họ tên)!"
-            });
+            return res.status(400).json({ success: false, message: "Thiếu thông tin khách hàng!" });
         }
 
         const finalOrderCode = order_code || `ORD-${Date.now()}`;
 
-        // 1. Lưu vào Supabase
         const { error } = await supabase
             .from("orders")
             .insert([{
@@ -44,49 +38,58 @@ router.post("/", async (req, res) => {
 
         if (error) throw error;
 
-        // 2. Gửi Email thông báo
-        // EMAIL_RECEIVER được cấu hình trên Render là email của bạn để test
+        // Gửi Email thông báo cho Admin
         const adminEmail = process.env.EMAIL_RECEIVER || "trung142p@gmail.com";
-
         transporter.sendMail({
             from: `"Hệ thống Shop" <${process.env.EMAIL_USER || "trung142p@gmail.com"}>`,
             to: adminEmail,
             subject: `🔔 ĐƠN HÀNG MỚI: ${finalOrderCode}`,
-            html: `
-                <div style="font-family: sans-serif; line-height: 1.5;">
-                    <h2 style="color: #db2777;">Thông báo đơn hàng mới</h2>
-                    <p><strong>Mã đơn hàng:</strong> ${finalOrderCode}</p>
-                    <p><strong>Khách hàng:</strong> ${customer_info.name}</p>
-                    <p><strong>Số điện thoại:</strong> ${customer_info.phone}</p>
-                    <p><strong>Địa chỉ:</strong> ${customer_info.addressDetail}, ${customer_info.district}, ${customer_info.province}</p>
-                    <p><strong>Phương thức:</strong> ${payment_method === 'COD' ? 'Thanh toán khi nhận hàng' : 'Chuyển khoản trước 50%'}</p>
-                    <p><strong>Tổng tiền:</strong> <span style="font-size: 18px; color: #e11d48; font-weight: bold;">${Number(total_price).toLocaleString()}đ</span></p>
-                    <hr/>
-                    <p style="font-size: 12px; color: #666;">Vui lòng truy cập trang Admin để xem chi tiết và xử lý đơn hàng.</p>
-                </div>
-            `
-        }).then(() => console.log(`Email đã gửi tới: ${adminEmail}`))
-            .catch(e => console.error("Lỗi gửi mail:", e.message));
+            html: `<div style="font-family: sans-serif;">
+                    <h2 style="color: #db2777;">Có đơn hàng mới!</h2>
+                    <p><strong>Mã:</strong> ${finalOrderCode}</p>
+                    <p><strong>Khách:</strong> ${customer_info.name} - ${customer_info.phone}</p>
+                    <p><strong>Tổng tiền:</strong> ${Number(total_price).toLocaleString()}đ</p>
+                  </div>`
+        }).catch(e => console.error("Lỗi gửi mail:", e.message));
 
         return res.status(201).json({ success: true, message: "Đặt hàng thành công!" });
-
     } catch (err) {
-        console.error("Lỗi Server:", err.message);
-        return res.status(500).json({ success: false, message: "Lỗi hệ thống: " + err.message });
+        res.status(500).json({ success: false, message: err.message });
     }
 });
 
+// 2. Lấy danh sách đơn hàng (Dành cho Admin)
 router.get("/", async (req, res) => {
     try {
         const { data, error } = await supabase
             .from("orders")
             .select("*")
             .order('created_at', { ascending: false });
-
         if (error) throw error;
         res.json(data || []);
     } catch (err) {
         res.status(500).json({ message: err.message });
+    }
+});
+
+// 3. CẬP NHẬT TRẠNG THÁI (Đây là phần Trung đang thiếu)
+router.patch("/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = req.body; // Dữ liệu gửi lên: { status: "..." } hoặc { payment_status: "..." }
+
+        const { data, error } = await supabase
+            .from("orders")
+            .update(updates)
+            .eq("id", id) // Phải khớp với tên cột ID trong bảng orders của bạn
+            .select();
+
+        if (error) throw error;
+
+        res.json({ success: true, data });
+    } catch (err) {
+        console.error("Lỗi cập nhật:", err.message);
+        res.status(500).json({ success: false, message: "Lỗi Server: " + err.message });
     }
 });
 
