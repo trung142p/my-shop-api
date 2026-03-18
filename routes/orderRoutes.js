@@ -45,16 +45,16 @@ router.post("/", async (req, res) => {
             to: adminEmail,
             subject: `🔔 ĐƠN HÀNG MỚI: ${finalOrderCode}`,
             html: `
-        <div style="font-family: Arial, sans-serif; border: 1px solid #eee; padding: 20px;">
-            <h2 style="color: #db2777;">Có đơn hàng mới từ ${customer_info.name}!</h2>
-            <p><strong>Mã đơn:</strong> ${finalOrderCode}</p>
-            <p><strong>SĐT:</strong> ${customer_info.phone}</p>
-            <p><strong>Địa chỉ:</strong> ${customer_info.addressDetail}, ${customer_info.district}, ${customer_info.province}</p>
-            <p><strong>Tổng tiền:</strong> <span style="color: red; font-size: 18px;">${Number(total_price).toLocaleString()}₫</span></p>
-            <hr/>
-            <p>Vui lòng kiểm tra Admin Dashboard để xử lý.</p>
-        </div>
-    `
+        <div style="font-family: Arial, sans-serif; border: 1px solid #eee; padding: 20px;">
+            <h2 style="color: #db2777;">Có đơn hàng mới từ ${customer_info.name}!</h2>
+            <p><strong>Mã đơn:</strong> ${finalOrderCode}</p>
+            <p><strong>SĐT:</strong> ${customer_info.phone}</p>
+            <p><strong>Địa chỉ:</strong> ${customer_info.addressDetail}, ${customer_info.district}, ${customer_info.province}</p>
+            <p><strong>Tổng tiền:</strong> <span style="color: red; font-size: 18px;">${Number(total_price).toLocaleString()}₫</span></p>
+            <hr/>
+            <p>Vui lòng kiểm tra Admin Dashboard để xử lý.</p>
+        </div>
+    `
         };
         transporter.sendMail(mailOptions).catch(e => console.error("Lỗi gửi mail:", e.message));
     } catch (err) {
