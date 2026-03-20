@@ -1,9 +1,10 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const sgMail = require("@sendgrid/mail");  // ← PHẢI LÀ SENDGRID
+const { Resend } = require("resend");
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);  // ← LẤY API KEY TỪ ENV
+// Khởi tạo Resend với API key
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const productRoutes = require("./routes/productRoutes");
 const adminRoutes = require("./routes/adminRoutes");
@@ -19,21 +20,27 @@ app.get("/test", (req, res) => {
 });
 
 app.post("/test-email", async (req, res) => {
-    const fromEmail = process.env.EMAIL_USER || "trung142p@gmail.com";
     const toEmail = process.env.EMAIL_RECEIVER || "trung142p@gmail.com";
-
-    const msg = {
-        to: toEmail,
-        from: fromEmail,
-        subject: "Test email từ server",
-        text: "Nếu bạn nhận được email này, cấu hình SendGrid đã hoạt động."
-    };
+    // Email gửi từ Resend (email mặc định hoặc domain đã xác thực)
+    const fromEmail = "onboarding@resend.dev"; // Email mặc định của Resend
 
     try {
-        await sgMail.send(msg);
-        res.json({ ok: true, message: "Email test đã được gửi qua SendGrid" });
+        const { data, error } = await resend.emails.send({
+            from: fromEmail,
+            to: toEmail,
+            subject: "Test email từ server",
+            html: "<p>Nếu bạn nhận được email này, cấu hình Resend đã hoạt động!</p>"
+        });
+
+        if (error) {
+            console.error("Lỗi Resend:", error);
+            return res.status(500).json({ error: error.message });
+        }
+
+        console.log("✅ Email sent via Resend:", data);
+        res.json({ ok: true, message: "Email test đã được gửi qua Resend", data });
     } catch (err) {
-        console.error("Lỗi gửi test email:", err.response?.body || err.message);
+        console.error("Lỗi gửi test email:", err);
         res.status(500).json({ error: err.message });
     }
 });

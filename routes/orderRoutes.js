@@ -1,10 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const { createClient } = require("@supabase/supabase-js");
-const sgMail = require("@sendgrid/mail");
+const { Resend } = require("resend");
 
-// Cấu hình SendGrid - API key lấy từ biến môi trường
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+// Khởi tạo Resend
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -33,13 +33,13 @@ router.post("/", async (req, res) => {
 
         if (error) throw error;
 
-        // Gửi email qua SendGrid
-        const fromEmail = process.env.EMAIL_USER || "trung142p@gmail.com";
+        // Gửi email qua Resend
         const toEmail = process.env.EMAIL_RECEIVER || "trung142p@gmail.com";
+        const fromEmail = "onboarding@resend.dev"; // Email mặc định của Resend
 
-        const msg = {
-            to: toEmail,
+        const { data, emailError } = await resend.emails.send({
             from: fromEmail,
+            to: toEmail,
             subject: `🔔 ĐƠN HÀNG MỚI: ${finalOrderCode}`,
             html: `
                 <div style="font-family: Arial, sans-serif; border: 1px solid #eee; padding: 20px;">
@@ -52,12 +52,13 @@ router.post("/", async (req, res) => {
                     <p>Vui lòng kiểm tra Admin Dashboard để xử lý.</p>
                 </div>
             `
-        };
+        });
 
-        // Gửi email không chờ
-        sgMail.send(msg)
-            .then(() => console.log("✅ Email sent via SendGrid"))
-            .catch(e => console.error("❌ SendGrid error:", e.response?.body || e.message));
+        if (emailError) {
+            console.error("❌ Resend error:", emailError);
+        } else {
+            console.log("✅ Email sent via Resend:", data);
+        }
 
         // Trả về thành công
         res.json({
