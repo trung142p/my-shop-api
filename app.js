@@ -1,9 +1,10 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const nodemailer = require("nodemailer"); // Thêm import này
+const sgMail = require("@sendgrid/mail");  // ← PHẢI LÀ SENDGRID
 
-// Import đủ 3 Routes
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);  // ← LẤY API KEY TỪ ENV
+
 const productRoutes = require("./routes/productRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const orderRoutes = require("./routes/orderRoutes");
@@ -17,35 +18,26 @@ app.get("/test", (req, res) => {
     res.send("Server vẫn đang sống khỏe mạnh!");
 });
 
-// Endpoint test email (thêm mới)
 app.post("/test-email", async (req, res) => {
-    const transporter = nodemailer.createTransport({
-        host: "smtp.gmail.com",
-        port: 587,
-        secure: false, // false vì dùng port 587
-        auth: {
-            user: process.env.EMAIL_USER || "trung142p@gmail.com",
-            pass: process.env.EMAIL_PASS || "itgyatbljobrqath",
-        },
-        tls: {
-            rejectUnauthorized: false // tránh lỗi certificate
-        }
-    });
+    const fromEmail = process.env.EMAIL_USER || "trung142p@gmail.com";
+    const toEmail = process.env.EMAIL_RECEIVER || "trung142p@gmail.com";
+
+    const msg = {
+        to: toEmail,
+        from: fromEmail,
+        subject: "Test email từ server",
+        text: "Nếu bạn nhận được email này, cấu hình SendGrid đã hoạt động."
+    };
+
     try {
-        await transporter.sendMail({
-            from: `"Test" <${process.env.EMAIL_USER}>`,
-            to: process.env.EMAIL_RECEIVER,
-            subject: "Test email từ server",
-            text: "Nếu bạn nhận được email này, cấu hình email đã hoạt động."
-        });
-        res.json({ ok: true, message: "Email test đã được gửi" });
+        await sgMail.send(msg);
+        res.json({ ok: true, message: "Email test đã được gửi qua SendGrid" });
     } catch (err) {
-        console.error("Lỗi gửi test email:", err);
+        console.error("Lỗi gửi test email:", err.response?.body || err.message);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Đăng ký đủ 3 Routes
 app.use("/api/products", productRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/orders", orderRoutes);

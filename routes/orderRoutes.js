@@ -1,23 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const { createClient } = require("@supabase/supabase-js");
-const nodemailer = require("nodemailer");
+const sgMail = require("@sendgrid/mail");
+
+// Cấu hình SendGrid - API key lấy từ biến môi trường
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
-// Cấu hình SMTP với port 587
-const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    auth: {
-        user: process.env.EMAIL_USER || "trung142p@gmail.com",
-        pass: process.env.EMAIL_PASS || "itgyatbljobrqath",
-    },
-    tls: {
-        rejectUnauthorized: false
-    }
-});
 
 // 1. Tạo đơn hàng mới
 router.post("/", async (req, res) => {
@@ -44,31 +33,33 @@ router.post("/", async (req, res) => {
 
         if (error) throw error;
 
-        // Gửi email thông báo
-        const adminEmail = process.env.EMAIL_RECEIVER || "trung142p@gmail.com";
-        const mailOptions = {
-            from: `"Hệ thống Shop" <${process.env.EMAIL_USER}>`,
-            to: adminEmail,
+        // Gửi email qua SendGrid
+        const fromEmail = process.env.EMAIL_USER || "trung142p@gmail.com";
+        const toEmail = process.env.EMAIL_RECEIVER || "trung142p@gmail.com";
+
+        const msg = {
+            to: toEmail,
+            from: fromEmail,
             subject: `🔔 ĐƠN HÀNG MỚI: ${finalOrderCode}`,
             html: `
-        <div style="font-family: Arial, sans-serif; border: 1px solid #eee; padding: 20px;">
-            <h2 style="color: #db2777;">Có đơn hàng mới từ ${customer_info.name}!</h2>
-            <p><strong>Mã đơn:</strong> ${finalOrderCode}</p>
-            <p><strong>SĐT:</strong> ${customer_info.phone}</p>
-            <p><strong>Địa chỉ:</strong> ${customer_info.addressDetail}, ${customer_info.district}, ${customer_info.province}</p>
-            <p><strong>Tổng tiền:</strong> <span style="color: red; font-size: 18px;">${Number(total_price).toLocaleString()}₫</span></p>
-            <hr/>
-            <p>Vui lòng kiểm tra Admin Dashboard để xử lý.</p>
-        </div>
-    `
+                <div style="font-family: Arial, sans-serif; border: 1px solid #eee; padding: 20px;">
+                    <h2 style="color: #db2777;">Có đơn hàng mới từ ${customer_info.name}!</h2>
+                    <p><strong>Mã đơn:</strong> ${finalOrderCode}</p>
+                    <p><strong>SĐT:</strong> ${customer_info.phone}</p>
+                    <p><strong>Địa chỉ:</strong> ${customer_info.addressDetail}, ${customer_info.district}, ${customer_info.province}</p>
+                    <p><strong>Tổng tiền:</strong> <span style="color: red; font-size: 18px;">${Number(total_price).toLocaleString()}₫</span></p>
+                    <hr/>
+                    <p>Vui lòng kiểm tra Admin Dashboard để xử lý.</p>
+                </div>
+            `
         };
 
-        // Gửi email và log
-        transporter.sendMail(mailOptions)
-            .then(info => console.log("✅ Email sent:", info.response))
-            .catch(e => console.error("❌ Email error:", e.message));
+        // Gửi email không chờ
+        sgMail.send(msg)
+            .then(() => console.log("✅ Email sent via SendGrid"))
+            .catch(e => console.error("❌ SendGrid error:", e.response?.body || e.message));
 
-        // Trả về thành công KÈM THEO MÃ ĐƠN HÀNG
+        // Trả về thành công
         res.json({
             success: true,
             message: "Đặt hàng thành công!",
