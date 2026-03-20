@@ -10,7 +10,20 @@ router.get("/", async (req, res) => {
         const { data, error } = await supabase.from("products").select("*");
         if (error) throw error;
         console.log(`Đã gửi về ${data.length} sản phẩm`);
-        res.json(data || []);
+
+        // Chuyển đổi specs từ JSON string sang object khi trả về
+        const processedData = data.map(product => {
+            if (product.specs && typeof product.specs === 'string') {
+                try {
+                    product.specs = JSON.parse(product.specs);
+                } catch (e) {
+                    product.specs = [];
+                }
+            }
+            return product;
+        });
+
+        res.json(processedData || []);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -26,6 +39,16 @@ router.get("/:id", async (req, res) => {
             .single();
 
         if (error) throw error;
+
+        // Chuyển đổi specs từ JSON string sang object
+        if (data.specs && typeof data.specs === 'string') {
+            try {
+                data.specs = JSON.parse(data.specs);
+            } catch (e) {
+                data.specs = [];
+            }
+        }
+
         res.json(data);
     } catch (err) {
         res.status(500).json({ message: "Không tìm thấy sản phẩm" });
@@ -35,12 +58,14 @@ router.get("/:id", async (req, res) => {
 // 3. TẠO SẢN PHẨM MỚI (POST)
 router.post("/", async (req, res) => {
     try {
-        const productData = req.body;
+        const productData = { ...req.body };
 
-        // Xử lý specs nếu là object thì chuyển thành JSON string
-        if (productData.specs && typeof productData.specs === 'object') {
+        // Xử lý specs: nếu là mảng thì chuyển thành JSON string để lưu vào database
+        if (productData.specs && Array.isArray(productData.specs)) {
             productData.specs = JSON.stringify(productData.specs);
         }
+
+        console.log("Tạo sản phẩm:", productData);
 
         const { data, error } = await supabase
             .from("products")
@@ -59,12 +84,19 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
     try {
         const { id } = req.params;
-        const updates = req.body;
+        const updates = { ...req.body };
 
-        // Xử lý specs nếu là object thì chuyển thành JSON string
-        if (updates.specs && typeof updates.specs === 'object') {
+        console.log("Cập nhật sản phẩm ID:", id);
+        console.log("Dữ liệu nhận được:", updates);
+
+        // Xử lý specs: nếu là mảng thì chuyển thành JSON string
+        if (updates.specs && Array.isArray(updates.specs)) {
             updates.specs = JSON.stringify(updates.specs);
         }
+
+        // Loại bỏ các trường không cần thiết (id, created_at)
+        delete updates.id;
+        delete updates.created_at;
 
         const { data, error } = await supabase
             .from("products")
@@ -72,10 +104,22 @@ router.put("/:id", async (req, res) => {
             .eq("id", id)
             .select();
 
-        if (error) throw error;
+        if (error) {
+            console.error("Lỗi Supabase:", error);
+            throw error;
+        }
 
         if (!data || data.length === 0) {
             return res.status(404).json({ message: "Không tìm thấy sản phẩm" });
+        }
+
+        // Chuyển specs từ JSON string sang object trước khi trả về
+        if (data[0].specs && typeof data[0].specs === 'string') {
+            try {
+                data[0].specs = JSON.parse(data[0].specs);
+            } catch (e) {
+                data[0].specs = [];
+            }
         }
 
         res.json(data[0]);
@@ -109,6 +153,8 @@ router.patch("/:id", async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
+
+        console.log("PATCH sản phẩm ID:", id, updates);
 
         const { data, error } = await supabase
             .from("products")
