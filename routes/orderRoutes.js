@@ -68,8 +68,12 @@ router.post("/", async (req, res) => {
             .then(info => console.log("✅ Email sent:", info.response))
             .catch(e => console.error("❌ Email error:", e.message));
 
-        // Trả về thành công
-        res.json({ success: true, message: "Đặt hàng thành công!" });
+        // Trả về thành công KÈM THEO MÃ ĐƠN HÀNG
+        res.json({
+            success: true,
+            message: "Đặt hàng thành công!",
+            order_code: finalOrderCode
+        });
 
     } catch (err) {
         console.error("Lỗi tạo đơn:", err.message);
