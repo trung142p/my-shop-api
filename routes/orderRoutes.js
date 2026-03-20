@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-// 1. Tạo đơn hàng mới (Dành cho khách hàng)
+// 1. Tạo đơn hàng mới
 router.post("/", async (req, res) => {
     try {
         const { order_code, customer_info, items, total_price, payment_method } = req.body;
@@ -38,7 +38,7 @@ router.post("/", async (req, res) => {
 
         if (error) throw error;
 
-        // Gửi Email thông báo cho Admin
+        // Gửi email thông báo (bất đồng bộ, không chờ)
         const adminEmail = process.env.EMAIL_RECEIVER || "trung142p@gmail.com";
         const mailOptions = {
             from: `"Hệ thống Shop" <${process.env.EMAIL_USER}>`,
@@ -56,13 +56,22 @@ router.post("/", async (req, res) => {
         </div>
     `
         };
-        transporter.sendMail(mailOptions).catch(e => console.error("Lỗi gửi mail:", e.message));
+
+        // Gửi email và log kết quả
+        transporter.sendMail(mailOptions)
+            .then(info => console.log("✅ Email sent:", info.response))
+            .catch(e => console.error("❌ Email error:", e.message));
+
+        // Trả về thành công cho client (không cần đợi email)
+        res.json({ success: true, message: "Đặt hàng thành công!" });
+
     } catch (err) {
+        console.error("Lỗi tạo đơn:", err.message);
         res.status(500).json({ success: false, message: err.message });
     }
 });
 
-// 2. Lấy danh sách đơn hàng (Dành cho Admin)
+// 2. Lấy danh sách đơn hàng
 router.get("/", async (req, res) => {
     try {
         const { data, error } = await supabase
@@ -76,20 +85,19 @@ router.get("/", async (req, res) => {
     }
 });
 
-// 3. CẬP NHẬT TRẠNG THÁI (Đây là phần Trung đang thiếu)
+// 3. Cập nhật trạng thái đơn hàng
 router.patch("/:id", async (req, res) => {
     try {
         const { id } = req.params;
-        const updates = req.body; // Dữ liệu gửi lên: { status: "..." } hoặc { payment_status: "..." }
+        const updates = req.body;
 
         const { data, error } = await supabase
             .from("orders")
             .update(updates)
-            .eq("id", id) // Phải khớp với tên cột ID trong bảng orders của bạn
+            .eq("id", id)
             .select();
 
         if (error) throw error;
-
         res.json({ success: true, data });
     } catch (err) {
         console.error("Lỗi cập nhật:", err.message);
@@ -97,7 +105,7 @@ router.patch("/:id", async (req, res) => {
     }
 });
 
-// 4. XÓA ĐƠN HÀNG (Thêm mới)
+// 4. Xóa đơn hàng
 router.delete("/:id", async (req, res) => {
     try {
         const { id } = req.params;
