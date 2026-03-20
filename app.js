@@ -20,10 +20,15 @@ app.get("/test", (req, res) => {
 // Endpoint test email (thêm mới)
 app.post("/test-email", async (req, res) => {
     const transporter = nodemailer.createTransport({
-        service: "gmail",
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false, // false vì dùng port 587
         auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
+            user: process.env.EMAIL_USER || "trung142p@gmail.com",
+            pass: process.env.EMAIL_PASS || "itgyatbljobrqath",
+        },
+        tls: {
+            rejectUnauthorized: false // tránh lỗi certificate
         }
     });
     try {

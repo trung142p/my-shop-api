@@ -5,12 +5,18 @@ const nodemailer = require("nodemailer");
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
+// Cấu hình SMTP với port 587
 const transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
     auth: {
         user: process.env.EMAIL_USER || "trung142p@gmail.com",
         pass: process.env.EMAIL_PASS || "itgyatbljobrqath",
     },
+    tls: {
+        rejectUnauthorized: false
+    }
 });
 
 // 1. Tạo đơn hàng mới
@@ -38,7 +44,7 @@ router.post("/", async (req, res) => {
 
         if (error) throw error;
 
-        // Gửi email thông báo (bất đồng bộ, không chờ)
+        // Gửi email thông báo
         const adminEmail = process.env.EMAIL_RECEIVER || "trung142p@gmail.com";
         const mailOptions = {
             from: `"Hệ thống Shop" <${process.env.EMAIL_USER}>`,
@@ -57,12 +63,12 @@ router.post("/", async (req, res) => {
     `
         };
 
-        // Gửi email và log kết quả
+        // Gửi email và log
         transporter.sendMail(mailOptions)
             .then(info => console.log("✅ Email sent:", info.response))
             .catch(e => console.error("❌ Email error:", e.message));
 
-        // Trả về thành công cho client (không cần đợi email)
+        // Trả về thành công
         res.json({ success: true, message: "Đặt hàng thành công!" });
 
     } catch (err) {
@@ -85,7 +91,7 @@ router.get("/", async (req, res) => {
     }
 });
 
-// 3. Cập nhật trạng thái đơn hàng
+// 3. Cập nhật trạng thái
 router.patch("/:id", async (req, res) => {
     try {
         const { id } = req.params;
