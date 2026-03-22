@@ -175,4 +175,80 @@ router.patch("/:id", async (req, res) => {
     }
 });
 
+// ==================== VARIANTS MANAGEMENT ====================
+
+// Lấy tất cả variants của một sản phẩm
+router.get("/:productId/variants", async (req, res) => {
+    try {
+        const { productId } = req.params;
+        const { data, error } = await supabase
+            .from("variants")
+            .select("*")
+            .eq("product_id", productId)
+            .order("id");
+
+        if (error) throw error;
+        res.json(data || []);
+    } catch (err) {
+        console.error("Lỗi lấy variants:", err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Tạo variant mới
+router.post("/:productId/variants", async (req, res) => {
+    try {
+        const { productId } = req.params;
+        const variantData = { ...req.body, product_id: parseInt(productId) };
+
+        const { data, error } = await supabase
+            .from("variants")
+            .insert([variantData])
+            .select();
+
+        if (error) throw error;
+        res.status(201).json(data[0]);
+    } catch (err) {
+        console.error("Lỗi tạo variant:", err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Cập nhật variant
+router.put("/variants/:variantId", async (req, res) => {
+    try {
+        const { variantId } = req.params;
+        const updates = req.body;
+
+        const { data, error } = await supabase
+            .from("variants")
+            .update(updates)
+            .eq("id", variantId)
+            .select();
+
+        if (error) throw error;
+        res.json(data[0]);
+    } catch (err) {
+        console.error("Lỗi cập nhật variant:", err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Xóa variant
+router.delete("/variants/:variantId", async (req, res) => {
+    try {
+        const { variantId } = req.params;
+        const { error } = await supabase
+            .from("variants")
+            .delete()
+            .eq("id", variantId);
+
+        if (error) throw error;
+        res.json({ success: true, message: "Đã xóa biến thể!" });
+    } catch (err) {
+        console.error("Lỗi xóa variant:", err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
 module.exports = router;
