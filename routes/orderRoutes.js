@@ -8,14 +8,27 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 
 // 1. Tạo đơn hàng mới
 router.post("/", async (req, res) => {
+    console.log("========================================");
+    console.log("🚀 ĐÃ NHẬN REQUEST TẠO ĐƠN HÀNG");
+    console.log("========================================");
+
     try {
         const { order_code, customer_info, items, total_price, payment_method } = req.body;
 
+        console.log("📦 Thông tin khách hàng nhận được:");
+        console.log("- Name:", customer_info?.name);
+        console.log("- Email:", customer_info?.email);
+        console.log("- Receive updates:", customer_info?.receiveUpdates);
+        console.log("- Phone:", customer_info?.phone);
+        console.log("- Địa chỉ:", customer_info?.addressDetail);
+
         if (!customer_info || !customer_info.name) {
+            console.log("❌ Thiếu thông tin khách hàng!");
             return res.status(400).json({ success: false, message: "Thiếu thông tin khách hàng!" });
         }
 
         const finalOrderCode = order_code || `ORD-${Date.now()}`;
+        console.log("📝 Mã đơn hàng:", finalOrderCode);
 
         // Lưu email và receiveUpdates vào customer_info
         const customerData = {
@@ -40,95 +53,124 @@ router.post("/", async (req, res) => {
                 payment_status: "Chưa thanh toán"
             }]);
 
-        if (error) throw error;
+        if (error) {
+            console.error("❌ Lỗi Supabase:", error);
+            throw error;
+        }
+        console.log("✅ Đã lưu đơn hàng vào Supabase");
 
         const fromEmail = "onboarding@resend.dev";
 
         // ========== GỬI EMAIL CHO ADMIN ==========
         const adminEmail = process.env.EMAIL_RECEIVER || "trung142p@gmail.com";
+        console.log("📧 Đang gửi email cho admin:", adminEmail);
 
-        await resend.emails.send({
-            from: fromEmail,
-            to: adminEmail,
-            subject: `🔔 ĐƠN HÀNG MỚI: ${finalOrderCode}`,
-            html: `
-                <div style="font-family: Arial, sans-serif; border: 1px solid #eee; padding: 20px;">
-                    <h2 style="color: #db2777;">Có đơn hàng mới từ ${customer_info.name}!</h2>
-                    <p><strong>Mã đơn:</strong> ${finalOrderCode}</p>
-                    <p><strong>SĐT:</strong> ${customer_info.phone}</p>
-                    ${customer_info.email ? `<p><strong>Email:</strong> ${customer_info.email}</p>` : ''}
-                    <p><strong>Địa chỉ:</strong> ${customer_info.addressDetail}, ${customer_info.district}, ${customer_info.province}</p>
-                    <p><strong>Tổng tiền:</strong> <span style="color: red; font-size: 18px;">${Number(total_price).toLocaleString()}₫</span></p>
-                    <hr/>
-                    <p>Vui lòng kiểm tra Admin Dashboard để xử lý.</p>
-                </div>
-            `
-        }).catch(e => console.error("❌ Admin email error:", e));
+        try {
+            const adminResult = await resend.emails.send({
+                from: fromEmail,
+                to: adminEmail,
+                subject: `🔔 ĐƠN HÀNG MỚI: ${finalOrderCode}`,
+                html: `
+                    <div style="font-family: Arial, sans-serif; border: 1px solid #eee; padding: 20px;">
+                        <h2 style="color: #db2777;">Có đơn hàng mới từ ${customer_info.name}!</h2>
+                        <p><strong>Mã đơn:</strong> ${finalOrderCode}</p>
+                        <p><strong>SĐT:</strong> ${customer_info.phone}</p>
+                        ${customer_info.email ? `<p><strong>Email:</strong> ${customer_info.email}</p>` : ''}
+                        <p><strong>Địa chỉ:</strong> ${customer_info.addressDetail}, ${customer_info.district}, ${customer_info.province}</p>
+                        <p><strong>Tổng tiền:</strong> <span style="color: red; font-size: 18px;">${Number(total_price).toLocaleString()}₫</span></p>
+                        <hr/>
+                        <p>Vui lòng kiểm tra Admin Dashboard để xử lý.</p>
+                    </div>
+                `
+            });
+            console.log("✅ Email admin đã gửi thành công:", adminResult?.id);
+        } catch (e) {
+            console.error("❌ Lỗi gửi email admin:", e.message);
+        }
 
         // ========== GỬI EMAIL XÁC NHẬN CHO KHÁCH HÀNG ==========
         const customerEmail = customer_info.email;
         const receiveUpdates = customer_info.receiveUpdates;
 
+        console.log("========================================");
+        console.log("📧 KIỂM TRA GỬI EMAIL CHO KHÁCH");
+        console.log("- Customer email:", customerEmail);
+        console.log("- Receive updates:", receiveUpdates);
+        console.log("- Điều kiện:", !!(customerEmail && receiveUpdates));
+        console.log("========================================");
+
         if (customerEmail && receiveUpdates) {
+            console.log("✅ Đủ điều kiện, đang gửi email xác nhận đến:", customerEmail);
+
             // Tạo HTML chi tiết đơn hàng
             const itemsHtml = items.map(item => `
                 <tr>
                     <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.name}${item.variant_name ? ` (${item.variant_name})` : ''}</td>
                     <td style="padding: 8px; text-align: center; border-bottom: 1px solid #eee;">${item.quantity}</td>
                     <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">${(item.price * item.quantity).toLocaleString()}₫</td>
-                 </tr>
+                </tr>
             `).join('');
 
-            await resend.emails.send({
-                from: fromEmail,
-                to: customerEmail,
-                subject: `✅ XÁC NHẬN ĐƠN HÀNG #${finalOrderCode}`,
-                html: `
-                    <div style="font-family: Arial, sans-serif; border: 1px solid #eee; padding: 20px; max-width: 600px;">
-                        <h2 style="color: #db2777;">Cảm ơn bạn đã đặt hàng!</h2>
-                        <p>Xin chào <strong>${customer_info.name}</strong>,</p>
-                        <p>Đơn hàng <strong>#${finalOrderCode}</strong> của bạn đã được ghi nhận thành công.</p>
-                        
-                        <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0;">
-                            <p style="margin: 0;"><strong>📅 Ngày đặt:</strong> ${new Date().toLocaleString('vi-VN')}</p>
-                            <p style="margin: 5px 0 0;"><strong>💳 Phương thức thanh toán:</strong> ${payment_method === 'COD' ? 'Thanh toán khi nhận hàng' : 'Chuyển khoản trước 50%'}</p>
+            try {
+                const customerResult = await resend.emails.send({
+                    from: fromEmail,
+                    to: customerEmail,
+                    subject: `✅ XÁC NHẬN ĐƠN HÀNG #${finalOrderCode}`,
+                    html: `
+                        <div style="font-family: Arial, sans-serif; border: 1px solid #eee; padding: 20px; max-width: 600px;">
+                            <h2 style="color: #db2777;">Cảm ơn bạn đã đặt hàng!</h2>
+                            <p>Xin chào <strong>${customer_info.name}</strong>,</p>
+                            <p>Đơn hàng <strong>#${finalOrderCode}</strong> của bạn đã được ghi nhận thành công.</p>
+                            
+                            <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                                <p style="margin: 0;"><strong>📅 Ngày đặt:</strong> ${new Date().toLocaleString('vi-VN')}</p>
+                                <p style="margin: 5px 0 0;"><strong>💳 Phương thức thanh toán:</strong> ${payment_method === 'COD' ? 'Thanh toán khi nhận hàng' : 'Chuyển khoản trước 50%'}</p>
+                            </div>
+                            
+                            <h3>📋 Chi tiết đơn hàng:</h3>
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: #f3f4f6;">
+                                        <th style="padding: 8px; text-align: left;">Sản phẩm</th>
+                                        <th style="padding: 8px; text-align: center;">Số lượng</th>
+                                        <th style="padding: 8px; text-align: right;">Thành tiền</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${itemsHtml}
+                                </tbody>
+                            </table>
+                            
+                            <div style="margin-top: 15px; text-align: right;">
+                                <p><strong>Tổng tiền:</strong> <span style="color: #db2777; font-size: 18px;">${Number(total_price).toLocaleString()}₫</span></p>
+                            </div>
+                            
+                            <div style="margin-top: 20px; padding: 15px; background: #f9f5ff; border-radius: 8px;">
+                                <p style="margin: 0;"><strong>🔍 Tra cứu đơn hàng:</strong></p>
+                                <p style="margin: 5px 0 0;">Bạn có thể tra cứu trạng thái đơn hàng tại: <a href="https://thienduongsungsuong.vercel.app/track-order" style="color: #db2777;">https://thienduongsungsuong.vercel.app/track-order</a></p>
+                                <p style="margin: 5px 0 0; font-size: 12px; color: #666;">Mã đơn hàng: <strong>${finalOrderCode}</strong></p>
+                            </div>
+                            
+                            <hr style="margin: 20px 0;"/>
+                            <p style="color: #666; font-size: 12px;">
+                                Bạn nhận được email này vì đã đăng ký nhận thông báo từ shop.<br/>
+                                Nếu có bất kỳ thắc mắc, vui lòng liên hệ hotline: <strong>0792131283</strong>
+                            </p>
+                            <p style="color: #999; font-size: 12px;">© Thiên đường sung sướng - Shop đồ chơi người lớn cao cấp</p>
                         </div>
-                        
-                        <h3>📋 Chi tiết đơn hàng:</h3>
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <thead>
-                                <tr style="background: #f3f4f6;">
-                                    <th style="padding: 8px; text-align: left;">Sản phẩm</th>
-                                    <th style="padding: 8px; text-align: center;">Số lượng</th>
-                                    <th style="padding: 8px; text-align: right;">Thành tiền</th>
-                                 </tr>
-                            </thead>
-                            <tbody>
-                                ${itemsHtml}
-                            </tbody>
-                        </table>
-                        
-                        <div style="margin-top: 15px; text-align: right;">
-                            <p><strong>Tổng tiền:</strong> <span style="color: #db2777; font-size: 18px;">${Number(total_price).toLocaleString()}₫</span></p>
-                        </div>
-                        
-                        <div style="margin-top: 20px; padding: 15px; background: #f9f5ff; border-radius: 8px;">
-                            <p style="margin: 0;"><strong>🔍 Tra cứu đơn hàng:</strong></p>
-                            <p style="margin: 5px 0 0;">Bạn có thể tra cứu trạng thái đơn hàng tại: <a href="https://thienduongsungsuong.vercel.app/track-order" style="color: #db2777;">https://thienduongsungsuong.vercel.app/track-order</a></p>
-                            <p style="margin: 5px 0 0; font-size: 12px; color: #666;">Mã đơn hàng: <strong>${finalOrderCode}</strong></p>
-                        </div>
-                        
-                        <hr style="margin: 20px 0;"/>
-                        <p style="color: #666; font-size: 12px;">
-                            Bạn nhận được email này vì đã đăng ký nhận thông báo từ shop.<br/>
-                            Nếu có bất kỳ thắc mắc, vui lòng liên hệ hotline: <strong>0792131283</strong>
-                        </p>
-                        <p style="color: #999; font-size: 12px;">© Thiên đường sung sướng - Shop đồ chơi người lớn cao cấp</p>
-                    </div>
-                `
-            }).catch(e => console.error("❌ Customer confirmation email error:", e));
+                    `
+                });
+                console.log("✅ Email khách hàng đã gửi thành công:", customerResult?.id);
+            } catch (e) {
+                console.error("❌ Lỗi gửi email khách hàng:", e.message);
+            }
+        } else {
+            console.log("⚠️ KHÔNG gửi email khách vì không thỏa điều kiện:");
+            console.log("   - Có email?", !!customerEmail);
+            console.log("   - Nhận thông báo?", receiveUpdates);
         }
 
+        console.log("✅ Đặt hàng thành công, trả về response");
         res.json({
             success: true,
             message: "Đặt hàng thành công!",
@@ -136,7 +178,8 @@ router.post("/", async (req, res) => {
         });
 
     } catch (err) {
-        console.error("Lỗi tạo đơn:", err.message);
+        console.error("❌ LỖI TẠO ĐƠN:", err.message);
+        console.error(err.stack);
         res.status(500).json({ success: false, message: err.message });
     }
 });
@@ -234,7 +277,7 @@ router.patch("/:id", async (req, res) => {
                                     <th style="padding: 8px; text-align: left;">Sản phẩm</th>
                                     <th style="padding: 8px; text-align: center;">Số lượng</th>
                                     <th style="padding: 8px; text-align: right;">Thành tiền</th>
-                                 </tr>
+                                </tr>
                             </thead>
                             <tbody>
                                 ${itemsHtml}
