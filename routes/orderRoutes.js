@@ -42,7 +42,7 @@ router.post("/", async (req, res) => {
 
         if (error) throw error;
 
-        // Gửi email thông báo đơn hàng mới cho Admin (giữ nguyên)
+        // Gửi email thông báo đơn hàng mới cho Admin
         const adminEmail = process.env.EMAIL_RECEIVER || "trung142p@gmail.com";
         const fromEmail = "onboarding@resend.dev";
 
@@ -139,6 +139,15 @@ router.patch("/:id", async (req, res) => {
 
             const icon = statusIcons[updates.status] || "📦";
 
+            // Tạo HTML chi tiết đơn hàng
+            const itemsHtml = currentOrder.items?.map(item => `
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.name}</td>
+                    <td style="padding: 8px; text-align: center; border-bottom: 1px solid #eee;">${item.quantity}</td>
+                    <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">${(item.price * item.quantity).toLocaleString()}₫</td>
+                </tr>
+            `).join('');
+
             await resend.emails.send({
                 from: "onboarding@resend.dev",
                 to: customerEmail,
@@ -163,13 +172,7 @@ router.patch("/:id", async (req, res) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${currentOrder.items?.map(item => `
-                                    <tr>
-                                        <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.name}</td>
-                                        <td style="padding: 8px; text-align: center; border-bottom: 1px solid #eee;">${item.quantity}</td>
-                                        <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">${(item.price * item.quantity).toLocaleString()}₫</td>
-                                    </tr>
-                                `).join('')}
+                                ${itemsHtml}
                             </tbody>
                         </table>
                         

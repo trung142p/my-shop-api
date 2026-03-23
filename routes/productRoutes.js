@@ -251,4 +251,24 @@ router.delete("/variants/:variantId", async (req, res) => {
     }
 });
 
+// Cập nhật stock của variant (PATCH)
+router.patch("/variants/:variantId/stock", async (req, res) => {
+    try {
+        const { variantId } = req.params;
+        const { stock } = req.body;
+
+        const { data, error } = await supabase
+            .from("variants")
+            .update({ stock })
+            .eq("id", variantId)
+            .select();
+
+        if (error) throw error;
+        res.json(data[0]);
+    } catch (err) {
+        console.error("Lỗi cập nhật stock variant:", err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
 module.exports = router;
