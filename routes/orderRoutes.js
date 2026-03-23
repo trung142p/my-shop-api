@@ -42,9 +42,10 @@ router.post("/", async (req, res) => {
 
         if (error) throw error;
 
-        // Gửi email thông báo đơn hàng mới cho Admin
-        const adminEmail = process.env.EMAIL_RECEIVER || "trung142p@gmail.com";
         const fromEmail = "onboarding@resend.dev";
+
+        // ========== GỬI EMAIL CHO ADMIN ==========
+        const adminEmail = process.env.EMAIL_RECEIVER || "trung142p@gmail.com";
 
         await resend.emails.send({
             from: fromEmail,
@@ -63,6 +64,70 @@ router.post("/", async (req, res) => {
                 </div>
             `
         }).catch(e => console.error("❌ Admin email error:", e));
+
+        // ========== GỬI EMAIL XÁC NHẬN CHO KHÁCH HÀNG ==========
+        const customerEmail = customer_info.email;
+        const receiveUpdates = customer_info.receiveUpdates;
+
+        if (customerEmail && receiveUpdates) {
+            // Tạo HTML chi tiết đơn hàng
+            const itemsHtml = items.map(item => `
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.name}${item.variant_name ? ` (${item.variant_name})` : ''}</td>
+                    <td style="padding: 8px; text-align: center; border-bottom: 1px solid #eee;">${item.quantity}</td>
+                    <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">${(item.price * item.quantity).toLocaleString()}₫</td>
+                 </tr>
+            `).join('');
+
+            await resend.emails.send({
+                from: fromEmail,
+                to: customerEmail,
+                subject: `✅ XÁC NHẬN ĐƠN HÀNG #${finalOrderCode}`,
+                html: `
+                    <div style="font-family: Arial, sans-serif; border: 1px solid #eee; padding: 20px; max-width: 600px;">
+                        <h2 style="color: #db2777;">Cảm ơn bạn đã đặt hàng!</h2>
+                        <p>Xin chào <strong>${customer_info.name}</strong>,</p>
+                        <p>Đơn hàng <strong>#${finalOrderCode}</strong> của bạn đã được ghi nhận thành công.</p>
+                        
+                        <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                            <p style="margin: 0;"><strong>📅 Ngày đặt:</strong> ${new Date().toLocaleString('vi-VN')}</p>
+                            <p style="margin: 5px 0 0;"><strong>💳 Phương thức thanh toán:</strong> ${payment_method === 'COD' ? 'Thanh toán khi nhận hàng' : 'Chuyển khoản trước 50%'}</p>
+                        </div>
+                        
+                        <h3>📋 Chi tiết đơn hàng:</h3>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #f3f4f6;">
+                                    <th style="padding: 8px; text-align: left;">Sản phẩm</th>
+                                    <th style="padding: 8px; text-align: center;">Số lượng</th>
+                                    <th style="padding: 8px; text-align: right;">Thành tiền</th>
+                                 </tr>
+                            </thead>
+                            <tbody>
+                                ${itemsHtml}
+                            </tbody>
+                        </table>
+                        
+                        <div style="margin-top: 15px; text-align: right;">
+                            <p><strong>Tổng tiền:</strong> <span style="color: #db2777; font-size: 18px;">${Number(total_price).toLocaleString()}₫</span></p>
+                        </div>
+                        
+                        <div style="margin-top: 20px; padding: 15px; background: #f9f5ff; border-radius: 8px;">
+                            <p style="margin: 0;"><strong>🔍 Tra cứu đơn hàng:</strong></p>
+                            <p style="margin: 5px 0 0;">Bạn có thể tra cứu trạng thái đơn hàng tại: <a href="https://thienduongsungsuong.vercel.app/track-order" style="color: #db2777;">https://thienduongsungsuong.vercel.app/track-order</a></p>
+                            <p style="margin: 5px 0 0; font-size: 12px; color: #666;">Mã đơn hàng: <strong>${finalOrderCode}</strong></p>
+                        </div>
+                        
+                        <hr style="margin: 20px 0;"/>
+                        <p style="color: #666; font-size: 12px;">
+                            Bạn nhận được email này vì đã đăng ký nhận thông báo từ shop.<br/>
+                            Nếu có bất kỳ thắc mắc, vui lòng liên hệ hotline: <strong>0792131283</strong>
+                        </p>
+                        <p style="color: #999; font-size: 12px;">© Thiên đường sung sướng - Shop đồ chơi người lớn cao cấp</p>
+                    </div>
+                `
+            }).catch(e => console.error("❌ Customer confirmation email error:", e));
+        }
 
         res.json({
             success: true,
@@ -142,10 +207,10 @@ router.patch("/:id", async (req, res) => {
             // Tạo HTML chi tiết đơn hàng
             const itemsHtml = currentOrder.items?.map(item => `
                 <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.name}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.name}${item.variant_name ? ` (${item.variant_name})` : ''}</td>
                     <td style="padding: 8px; text-align: center; border-bottom: 1px solid #eee;">${item.quantity}</td>
                     <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">${(item.price * item.quantity).toLocaleString()}₫</td>
-                </tr>
+                 </tr>
             `).join('');
 
             await resend.emails.send({
@@ -169,7 +234,7 @@ router.patch("/:id", async (req, res) => {
                                     <th style="padding: 8px; text-align: left;">Sản phẩm</th>
                                     <th style="padding: 8px; text-align: center;">Số lượng</th>
                                     <th style="padding: 8px; text-align: right;">Thành tiền</th>
-                                </tr>
+                                 </tr>
                             </thead>
                             <tbody>
                                 ${itemsHtml}
