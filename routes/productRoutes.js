@@ -11,7 +11,6 @@ router.get("/", async (req, res) => {
         if (error) throw error;
         console.log(`Đã gửi về ${data.length} sản phẩm`);
 
-        // Chuyển đổi specs từ JSON string sang object khi trả về
         const processedData = data.map(product => {
             if (product.specs && typeof product.specs === 'string') {
                 try {
@@ -40,7 +39,6 @@ router.get("/:id", async (req, res) => {
 
         if (error) throw error;
 
-        // Chuyển đổi specs từ JSON string sang object
         if (data.specs && typeof data.specs === 'string') {
             try {
                 data.specs = JSON.parse(data.specs);
@@ -60,12 +58,11 @@ router.post("/", async (req, res) => {
     try {
         const productData = { ...req.body };
 
-        // Xử lý specs: nếu là mảng thì chuyển thành JSON string để lưu vào database
         if (productData.specs && Array.isArray(productData.specs)) {
             productData.specs = JSON.stringify(productData.specs);
         }
 
-        console.log("Tạo sản phẩm:", productData);
+        console.log("📦 Tạo sản phẩm:", productData);
 
         const { data, error } = await supabase
             .from("products")
@@ -86,15 +83,15 @@ router.put("/:id", async (req, res) => {
         const { id } = req.params;
         const updates = { ...req.body };
 
-        console.log("Cập nhật sản phẩm ID:", id);
-        console.log("Dữ liệu nhận được:", updates);
+        console.log("🔄 Cập nhật sản phẩm ID:", id);
+        console.log("📦 Dữ liệu cập nhật:", updates);
 
-        // Xử lý specs: nếu là mảng thì chuyển thành JSON string
         if (updates.specs && Array.isArray(updates.specs)) {
             updates.specs = JSON.stringify(updates.specs);
         }
 
-        // Loại bỏ các trường không cần thiết (id, created_at)
+        // 🔧 QUAN TRỌNG: KHÔNG xóa image và images
+        // Chỉ xóa các trường không nên có trong update
         delete updates.id;
         delete updates.created_at;
 
@@ -105,7 +102,7 @@ router.put("/:id", async (req, res) => {
             .select();
 
         if (error) {
-            console.error("Lỗi Supabase:", error);
+            console.error("❌ Lỗi Supabase:", error);
             throw error;
         }
 
@@ -113,7 +110,6 @@ router.put("/:id", async (req, res) => {
             return res.status(404).json({ message: "Không tìm thấy sản phẩm" });
         }
 
-        // Chuyển specs từ JSON string sang object trước khi trả về
         if (data[0].specs && typeof data[0].specs === 'string') {
             try {
                 data[0].specs = JSON.parse(data[0].specs);
@@ -122,9 +118,10 @@ router.put("/:id", async (req, res) => {
             }
         }
 
+        console.log("✅ Cập nhật thành công:", data[0]);
         res.json(data[0]);
     } catch (err) {
-        console.error("Lỗi cập nhật sản phẩm:", err);
+        console.error("❌ Lỗi cập nhật sản phẩm:", err);
         res.status(500).json({ message: err.message });
     }
 });
@@ -148,13 +145,13 @@ router.delete("/:id", async (req, res) => {
     }
 });
 
-// 6. CẬP NHẬT MỘT PHẦN SẢN PHẨM (PATCH) - dùng cho cập nhật stock/sold
+// 6. CẬP NHẬT MỘT PHẦN SẢN PHẨM (PATCH)
 router.patch("/:id", async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
 
-        console.log("PATCH sản phẩm ID:", id, updates);
+        console.log("📝 PATCH sản phẩm ID:", id, updates);
 
         const { data, error } = await supabase
             .from("products")
